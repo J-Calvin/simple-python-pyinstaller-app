@@ -1,13 +1,28 @@
 node {
   stage('Build') {
     docker.image('python:2-alpine').inside {
-      sh 'python -m py_compile ./sources/add2vals.py ./sources/calc.py'
+        sh 'python -m py_compile ./sources/add2vals.py ./sources/calc.py'
     }
   }
 
   stage('Test') {
     docker.image('qnib/pytest').inside {
-      sh 'py.test --verbose --junit-xml test-reports/results.xml ./sources/test_calc.py'
+        sh 'py.test --verbose --junit-xml test-reports/results.xml ./sources/test_calc.py'
+    }
+  }
+  
+  stage('Manual Approval Stage'){
+    input message: 'Lanjutkan ke tahap Deploy? (Click "Proceed" to continue)'    
+  }
+  
+  stage('Deploy') {
+    docker.image('python:3.9').inside("-u root") {
+        sh 'pip install pyinstaller'
+        sh 'pyinstaller --onefile sources/add2vals.py'
+        sshagent(credentials: ['EC2-SSH-KEY']){
+            sh 'scp -o StrictHostKeyChecking=no dist/add2vals ubuntu@13.211.175.69:/home/ubuntu/JCalvin/python'
+        }
+        sleep time: 1, unit:'MINUTES'
     }
   }
 }
